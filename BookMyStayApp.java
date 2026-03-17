@@ -1,28 +1,24 @@
 import java.util.*;
 
-// Abstract Room Class
+// -------------------- DOMAIN --------------------
+
+// Abstract Room
 abstract class Room {
-    private int numberOfBeds;
+    private int beds;
     private double size;
     private double price;
 
-    public Room(int numberOfBeds, double size, double price) {
-        this.numberOfBeds = numberOfBeds;
+    public Room(int beds, double size, double price) {
+        this.beds = beds;
         this.size = size;
         this.price = price;
     }
 
-    public int getNumberOfBeds() { return numberOfBeds; }
-    public double getSize() { return size; }
-    public double getPrice() { return price; }
-
     public abstract String getRoomType();
 
     public void displayDetails() {
-        System.out.println("Room Type: " + getRoomType());
-        System.out.println("Beds: " + numberOfBeds);
-        System.out.println("Size: " + size + " sq.ft");
-        System.out.println("Price: ₹" + price);
+        System.out.println(getRoomType() + " | Beds: " + beds +
+                " | Size: " + size + " sq.ft | Price: ₹" + price);
     }
 }
 
@@ -42,85 +38,110 @@ class SuiteRoom extends Room {
     public String getRoomType() { return "Suite"; }
 }
 
-// Central Inventory (Same as UC3)
+// -------------------- INVENTORY (UNCHANGED STATE) --------------------
+
 class RoomInventory {
-    private HashMap<String, Integer> availability;
+    private HashMap<String, Integer> availability = new HashMap<>();
 
     public RoomInventory() {
-        availability = new HashMap<>();
         availability.put("Single", 5);
         availability.put("Double", 3);
-        availability.put("Suite", 0); // purposely 0 to test filtering
+        availability.put("Suite", 2);
     }
 
-    // READ-ONLY access
-    public int getAvailability(String roomType) {
-        return availability.getOrDefault(roomType, 0);
-    }
-
-    // Optional: expose full map safely
-    public Map<String, Integer> getAllAvailability() {
-        return Collections.unmodifiableMap(availability);
+    public int getAvailability(String type) {
+        return availability.getOrDefault(type, 0);
     }
 }
 
-// 🔥 Search Service (CORE OF UC4)
-class RoomSearchService {
+// -------------------- RESERVATION (NEW ACTOR) --------------------
 
-    private RoomInventory inventory;
-    private List<Room> rooms;
+class Reservation {
+    private String guestName;
+    private String roomType;
 
-    public RoomSearchService(RoomInventory inventory, List<Room> rooms) {
-        this.inventory = inventory;
-        this.rooms = rooms;
+    public Reservation(String guestName, String roomType) {
+        this.guestName = guestName;
+        this.roomType = roomType;
     }
 
-    // Read-only search
-    public void searchAvailableRooms() {
-        System.out.println("\n=== Available Rooms ===");
+    public String getGuestName() { return guestName; }
+    public String getRoomType() { return roomType; }
 
-        boolean found = false;
-
-        for (Room room : rooms) {
-
-            int available = inventory.getAvailability(room.getRoomType());
-
-            // Validation → only show available rooms
-            if (available > 0) {
-                room.displayDetails();
-                System.out.println("Available: " + available);
-                System.out.println("--------------------------");
-                found = true;
-            }
-        }
-
-        // Defensive programming
-        if (!found) {
-            System.out.println("No rooms available at the moment.");
-        }
+    public void display() {
+        System.out.println("Guest: " + guestName + " | Requested: " + roomType);
     }
 }
 
-// Main Application
+// -------------------- BOOKING QUEUE (CORE OF UC5) --------------------
+
+class BookingQueue {
+
+    private Queue<Reservation> queue;
+
+    public BookingQueue() {
+        queue = new LinkedList<>();
+    }
+
+    // Add booking request (FIFO maintained automatically)
+    public void addRequest(Reservation reservation) {
+        queue.offer(reservation);
+        System.out.println("Request added for " + reservation.getGuestName());
+    }
+
+    // View all queued requests (read-only)
+    public void displayQueue() {
+        System.out.println("\n=== Booking Request Queue ===");
+
+        if (queue.isEmpty()) {
+            System.out.println("No pending requests.");
+            return;
+        }
+
+        for (Reservation r : queue) {
+            r.display();
+        }
+    }
+
+    // Peek next request (without removing)
+    public Reservation peekNext() {
+        return queue.peek();
+    }
+
+    // Remove next request (for future UC6 processing)
+    public Reservation pollNext() {
+        return queue.poll();
+    }
+}
+
+// -------------------- MAIN APP --------------------
+
 public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        // Initialize inventory (state)
+        // Inventory (NOT modified here)
         RoomInventory inventory = new RoomInventory();
 
-        // Initialize room domain objects
-        List<Room> rooms = new ArrayList<>();
-        rooms.add(new SingleRoom());
-        rooms.add(new DoubleRoom());
-        rooms.add(new SuiteRoom());
+        // Booking Queue
+        BookingQueue bookingQueue = new BookingQueue();
 
-        // Initialize search service
-        RoomSearchService searchService = new RoomSearchService(inventory, rooms);
+        // Guest submits requests
+        bookingQueue.addRequest(new Reservation("Shagun", "Single"));
+        bookingQueue.addRequest(new Reservation("Avani", "Suite"));
+        bookingQueue.addRequest(new Reservation("Shreya", "Double"));
+        bookingQueue.addRequest(new Reservation("Sahithi", "Single"));
 
-        // Guest triggers search
-        searchService.searchAvailableRooms();
+        // Display queue (arrival order preserved)
+        bookingQueue.displayQueue();
 
-        System.out.println("\n(Search completed — no state changed)");
+        // Show next request (FIFO)
+        System.out.println("\nNext request to process:");
+        Reservation next = bookingQueue.peekNext();
+        if (next != null) {
+            next.display();
+        }
+
+        System.out.println("\n(No inventory changes yet — requests only queued)");
     }
 }
