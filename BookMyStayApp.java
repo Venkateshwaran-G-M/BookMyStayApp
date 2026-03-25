@@ -1,7 +1,6 @@
 import java.util.*;
 
 // -------------------- ADD-ON SERVICE --------------------
-
 class AddOnService {
     private String name;
     private double price;
@@ -20,7 +19,6 @@ class AddOnService {
 }
 
 // -------------------- ADD-ON SERVICE MANAGER --------------------
-
 class AddOnServiceManager {
     private Map<String, List<AddOnService>> serviceMap = new HashMap<>();
 
@@ -44,7 +42,6 @@ class AddOnServiceManager {
 
     public void displayServices(String reservationId) {
         System.out.println("\n=== Add-On Services for " + reservationId + " ===");
-
         List<AddOnService> services = getServices(reservationId);
 
         if (services.isEmpty()) {
@@ -61,7 +58,6 @@ class AddOnServiceManager {
 }
 
 // -------------------- BOOKING RECORD --------------------
-
 class BookingRecord {
     private String reservationId;
     private String guestName;
@@ -74,6 +70,7 @@ class BookingRecord {
     }
 
     public String getReservationId() { return reservationId; }
+    public String getRoomType() { return roomType; }
 
     public void display() {
         System.out.println("Reservation ID: " + reservationId +
@@ -83,7 +80,6 @@ class BookingRecord {
 }
 
 // -------------------- BOOKING HISTORY --------------------
-
 class BookingHistory {
     private List<BookingRecord> history = new ArrayList<>();
 
@@ -107,14 +103,25 @@ class BookingHistory {
             record.display();
         }
     }
+
+    public BookingRecord findBooking(String reservationId) {
+        for (BookingRecord record : history) {
+            if (record.getReservationId().equals(reservationId)) {
+                return record;
+            }
+        }
+        return null;
+    }
+
+    public void removeBooking(String reservationId) {
+        history.removeIf(record -> record.getReservationId().equals(reservationId));
+    }
 }
 
 // -------------------- BOOKING REPORT SERVICE --------------------
-
 class BookingReportService {
     public void generateReport(BookingHistory history) {
         System.out.println("\n=== Booking Report ===");
-
         List<BookingRecord> bookings = history.getAllBookings();
         System.out.println("Total Confirmed Bookings: " + bookings.size());
 
@@ -125,7 +132,6 @@ class BookingReportService {
 }
 
 // -------------------- VALIDATION EXCEPTION --------------------
-
 class ValidationException extends Exception {
     public ValidationException(String message) {
         super(message);
@@ -133,9 +139,7 @@ class ValidationException extends Exception {
 }
 
 // -------------------- BOOKING VALIDATOR --------------------
-
 class BookingValidator {
-
     public static void validate(String reservationId, String guestName, String roomType)
             throws ValidationException {
 
@@ -155,10 +159,59 @@ class BookingValidator {
     }
 }
 
-// -------------------- MAIN DEMO --------------------
+// -------------------- INVENTORY --------------------
+class Inventory {
+    private Map<String, Integer> roomInventory = new HashMap<>();
 
+    public Inventory() {
+        roomInventory.put("Single", 5);
+        roomInventory.put("Double", 3);
+        roomInventory.put("Deluxe", 2);
+    }
+
+    public void increaseRoom(String roomType) {
+        roomInventory.put(roomType, roomInventory.get(roomType) + 1);
+        System.out.println("Inventory updated: " + roomType + " rooms = " + roomInventory.get(roomType));
+    }
+
+    public void displayInventory() {
+        System.out.println("\n=== Current Inventory ===");
+        for (String type : roomInventory.keySet()) {
+            System.out.println(type + " Rooms: " + roomInventory.get(type));
+        }
+    }
+}
+
+// -------------------- CANCELLATION SERVICE --------------------
+class CancellationService {
+    private List<BookingRecord> cancelledBookings = new ArrayList<>();
+
+    public void cancelBooking(String reservationId, BookingHistory history, Inventory inventory) {
+
+        BookingRecord record = history.findBooking(reservationId);
+
+        if (record == null) {
+            System.out.println("Cancellation failed: Reservation not found.");
+            return;
+        }
+
+        inventory.increaseRoom(record.getRoomType());
+        history.removeBooking(reservationId);
+        cancelledBookings.add(record);
+
+        System.out.println("Booking " + reservationId + " cancelled successfully.");
+    }
+
+    public void displayCancelledBookings() {
+        System.out.println("\n=== Cancelled Bookings ===");
+        for (BookingRecord r : cancelledBookings) {
+            r.display();
+        }
+    }
+}
+
+// -------------------- MAIN CLASS --------------------
 public class BookMyStayApp {
-
     public static void main(String[] args) {
 
         String res1 = "S101";
@@ -177,17 +230,17 @@ public class BookMyStayApp {
         manager.displayServices(res1);
         manager.displayServices(res2);
 
+        // -------------------- UC8 + UC9 --------------------
         BookingHistory history = new BookingHistory();
         BookingReportService reportService = new BookingReportService();
 
         try {
-            // Valid booking
             BookingValidator.validate(res1, "Arun", "Single");
             BookingRecord b1 = new BookingRecord(res1, "Arun", "Single");
             history.addBooking(b1);
 
             // Invalid booking example
-            BookingValidator.validate(res2, "Me", "Luxury"); // Will cause error
+            BookingValidator.validate(res2, "Me", "Luxury");
             BookingRecord b2 = new BookingRecord(res2, "Me", "Luxury");
             history.addBooking(b2);
 
@@ -195,10 +248,21 @@ public class BookMyStayApp {
             System.out.println("Booking Error: " + e.getMessage());
         }
 
-        // Admin views history & report
         history.displayHistory();
         reportService.generateReport(history);
 
-        System.out.println("\nSystem continues running safely after handling errors ✅");
+        
+        Inventory inventory = new Inventory();
+        CancellationService cancelService = new CancellationService();
+
+        inventory.displayInventory();
+
+        cancelService.cancelBooking("S101", history, inventory);
+
+        inventory.displayInventory();
+        history.displayHistory();
+        cancelService.displayCancelledBookings();
+
+        System.out.println("\nSystem running safely with Add-ons, History, Validation, Cancellation ✅");
     }
 }
