@@ -1,7 +1,8 @@
 import java.util.*;
+import java.io.*;
 
 // -------------------- ADD-ON SERVICE --------------------
-class AddOnService {
+class AddOnService implements Serializable {
     private String name;
     private double price;
 
@@ -19,7 +20,7 @@ class AddOnService {
 }
 
 // -------------------- ADD-ON SERVICE MANAGER --------------------
-class AddOnServiceManager {
+class AddOnServiceManager implements Serializable {
     private Map<String, List<AddOnService>> serviceMap = new HashMap<>();
 
     public void addService(String reservationId, AddOnService service) {
@@ -58,7 +59,7 @@ class AddOnServiceManager {
 }
 
 // -------------------- BOOKING RECORD --------------------
-class BookingRecord {
+class BookingRecord implements Serializable {
     private String reservationId;
     private String guestName;
     private String roomType;
@@ -80,7 +81,7 @@ class BookingRecord {
 }
 
 // -------------------- BOOKING HISTORY --------------------
-class BookingHistory {
+class BookingHistory implements Serializable {
     private List<BookingRecord> history = new ArrayList<>();
 
     public synchronized void addBooking(BookingRecord record) {
@@ -113,7 +114,7 @@ class BookingHistory {
     }
 }
 
-// -------------------- REPORT SERVICE --------------------
+// -------------------- BOOKING REPORT SERVICE --------------------
 class BookingReportService {
     public void generateReport(BookingHistory history) {
         System.out.println("\n=== Booking Report ===");
@@ -144,7 +145,7 @@ class BookingValidator {
 }
 
 // -------------------- INVENTORY --------------------
-class Inventory {
+class Inventory implements Serializable {
     private Map<String, Integer> rooms = new HashMap<>();
 
     public Inventory() {
@@ -246,24 +247,67 @@ class ConcurrentBookingProcessor extends Thread {
     }
 }
 
+// -------------------- PERSISTENCE SERVICE (UC12) --------------------
+class PersistenceService {
+
+    public static void saveSystem(BookingHistory history, Inventory inventory) {
+        try {
+            ObjectOutputStream out = new ObjectOutputStream(
+                    new FileOutputStream("system_data.ser"));
+            out.writeObject(history);
+            out.writeObject(inventory);
+            out.close();
+            System.out.println("System state saved to file.");
+        } catch (Exception e) {
+            System.out.println("Error saving system state.");
+        }
+    }
+
+    public static Object[] loadSystem() {
+        try {
+            ObjectInputStream in = new ObjectInputStream(
+                    new FileInputStream("system_data.ser"));
+            BookingHistory history = (BookingHistory) in.readObject();
+            Inventory inventory = (Inventory) in.readObject();
+            in.close();
+            System.out.println("System state loaded from file.");
+            return new Object[]{history, inventory};
+        } catch (Exception e) {
+            System.out.println("No previous saved data found.");
+            return null;
+        }
+    }
+}
+
 // -------------------- MAIN --------------------
 public class BookMyStayApp {
     public static void main(String[] args) {
 
-        AddOnServiceManager manager = new AddOnServiceManager();
         BookingHistory history = new BookingHistory();
-        BookingReportService report = new BookingReportService();
         Inventory inventory = new Inventory();
+
+        // UC12 - Load previous state
+        Object[] data = PersistenceService.loadSystem();
+        if (data != null) {
+            history = (BookingHistory) data[0];
+            inventory = (Inventory) data[1];
+            System.out.println("Previous system state restored.");
+        }
+
+        AddOnServiceManager manager = new AddOnServiceManager();
+        BookingReportService report = new BookingReportService();
         CancellationService cancelService = new CancellationService();
 
         // UC7 Add-ons
         manager.addService("S101", new AddOnService("Breakfast", 300));
         manager.displayServices("S101");
 
-        // UC8 + UC9
+        // UC8 + UC9 Booking
         try {
             BookingValidator.validate("S101", "Arun", "Single");
-            history.addBooking(new BookingRecord("S101", "Arun", "Single"));
+            if (inventory.allocateRoom("Single")) {
+                history.addBooking(new BookingRecord("S101", "Arun", "Single"));
+            }
         } catch (ValidationException e) {
             System.out.println(e.getMessage());
         }
@@ -277,7 +321,6 @@ public class BookMyStayApp {
 
         // UC11 Concurrent Booking
         BookingQueue queue = new BookingQueue();
-
         queue.addRequest(new BookingRequest("B1", "John", "Single"));
         queue.addRequest(new BookingRequest("B2", "Mary", "Single"));
         queue.addRequest(new BookingRequest("B3", "David", "Single"));
@@ -289,5 +332,18 @@ public class BookMyStayApp {
 
         t1.start();
         t2.start();
+
+        try {
+            t1.join();
+            t2.join();
+        } catch (Exception e) {}
+
+        history.displayHistory();
+        inventory.displayInventory();
+
+        // UC12 - Save system state before shutdown
+        PersistenceService.saveSystem(history, inventory);
+
+        System.out.println("\nSystem finished execution.");
     }
 }
