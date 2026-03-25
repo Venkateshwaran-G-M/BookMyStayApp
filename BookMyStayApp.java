@@ -23,34 +23,26 @@ class AddOnService {
 
 class AddOnServiceManager {
 
-    // Map: ReservationID -> List of Services
     private Map<String, List<AddOnService>> serviceMap = new HashMap<>();
 
-    // Add services to a reservation
     public void addService(String reservationId, AddOnService service) {
         serviceMap.putIfAbsent(reservationId, new ArrayList<>());
         serviceMap.get(reservationId).add(service);
-
         System.out.println(service.getName() + " added to Reservation " + reservationId);
     }
 
-    // Get services for a reservation
     public List<AddOnService> getServices(String reservationId) {
         return serviceMap.getOrDefault(reservationId, new ArrayList<>());
     }
 
-    // Calculate total add-on cost
     public double calculateTotalCost(String reservationId) {
         double total = 0;
-
         for (AddOnService service : getServices(reservationId)) {
             total += service.getPrice();
         }
-
         return total;
     }
 
-    // Display services for a reservation
     public void displayServices(String reservationId) {
         System.out.println("\n=== Add-On Services for " + reservationId + " ===");
 
@@ -69,34 +61,110 @@ class AddOnServiceManager {
     }
 }
 
+// -------------------- BOOKING RECORD --------------------
+
+class BookingRecord {
+    private String reservationId;
+    private String guestName;
+    private String roomType;
+
+    public BookingRecord(String reservationId, String guestName, String roomType) {
+        this.reservationId = reservationId;
+        this.guestName = guestName;
+        this.roomType = roomType;
+    }
+
+    public String getReservationId() { return reservationId; }
+
+    public void display() {
+        System.out.println("Reservation ID: " + reservationId +
+                ", Guest: " + guestName +
+                ", Room Type: " + roomType);
+    }
+}
+
+// -------------------- BOOKING HISTORY --------------------
+
+class BookingHistory {
+    private List<BookingRecord> history = new ArrayList<>();
+
+    public void addBooking(BookingRecord record) {
+        history.add(record);
+        System.out.println("Booking added to history: " + record.getReservationId());
+    }
+
+    public List<BookingRecord> getAllBookings() {
+        return history;
+    }
+
+    public void displayHistory() {
+        System.out.println("\n=== Booking History ===");
+        if (history.isEmpty()) {
+            System.out.println("No bookings found.");
+            return;
+        }
+
+        for (BookingRecord record : history) {
+            record.display();
+        }
+    }
+}
+
+// -------------------- BOOKING REPORT SERVICE --------------------
+
+class BookingReportService {
+
+    public void generateReport(BookingHistory history) {
+        System.out.println("\n=== Booking Report ===");
+
+        List<BookingRecord> bookings = history.getAllBookings();
+
+        System.out.println("Total Confirmed Bookings: " + bookings.size());
+
+        for (BookingRecord record : bookings) {
+            record.display();
+        }
+    }
+}
+
 // -------------------- MAIN DEMO --------------------
 
 public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        // Assume these reservation IDs came from UC6 BookingService
         String res1 = "S101";
         String res2 = "D205";
 
-        // Initialize Add-On Manager
         AddOnServiceManager manager = new AddOnServiceManager();
 
-        // Available services
         AddOnService breakfast = new AddOnService("Breakfast", 300);
         AddOnService wifi = new AddOnService("Premium WiFi", 200);
         AddOnService spa = new AddOnService("Spa Access", 1000);
 
-        // Guest selects services
         manager.addService(res1, breakfast);
         manager.addService(res1, wifi);
-
         manager.addService(res2, spa);
 
-        // Display services
         manager.displayServices(res1);
         manager.displayServices(res2);
 
-        System.out.println("\n(Core booking & inventory unchanged ✅)");
+        BookingHistory history = new BookingHistory();
+        BookingReportService reportService = new BookingReportService();
+
+        // Assume bookings confirmed
+        BookingRecord b1 = new BookingRecord(res1, "Arun", "Single Room");
+        BookingRecord b2 = new BookingRecord(res2, "Meena", "Deluxe Room");
+
+        history.addBooking(b1);
+        history.addBooking(b2);
+
+        // Admin views history
+        history.displayHistory();
+
+        // Admin generates report
+        reportService.generateReport(history);
+
+        System.out.println("\n(Core booking, inventory, add-ons unchanged ✅)");
     }
 }
